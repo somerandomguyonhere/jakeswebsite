@@ -302,9 +302,9 @@
                 document.getElementById('noBtn').addEventListener('click', () => {
                     document.body.removeChild(popup);
                 });
-                document.getElementById('yesBtn').addEventListener('click', () => {
-                    window.location.href = 'https://cataredogs.neocities.org/';
-                });
+               document.getElementById('yesBtn').addEventListener('click', () => {
+    window.history.back();
+});
 
                 const errorTitle = popup.querySelector('.error-title');
                 let isDraggingPopup = false,
