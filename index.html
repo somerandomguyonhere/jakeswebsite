@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link id="favicon" rel="icon" type="image/png" href="https://cataredogs.neocities.org/img-files/shield.svg">
+
+    <title>Jake's Terminal</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: "Courier New", Consolas, "Lucida Console", monospace;
+            background-color: #222;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .terminal-window {
+            position: absolute;
+            width: 800px;
+            height: 500px;
+            background-color: #1e1e1e;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .terminal-bar {
+            height: 30px;
+            background-color: #2b2b2b;
+            display: flex;
+            align-items: center;
+            padding: 0 5px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+        .terminal-bar .drag-area {
+            flex: 1;
+            height: 100%;
+            cursor: grab;
+        }
+
+        .terminal-btn {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin: 0 4px;
+            cursor: pointer;
+        }
+
+        .btn-close {
+            background-color: #ff5f56;
+        }
+
+        .btn-minimize {
+            background-color: #ffbd2e;
+        }
+
+        .btn-maximize {
+            background-color: #27c93f;
+        }
+
+        #terminal {
+            flex: 1;
+            padding: 15px;
+            background-color: #000;
+            color: #00ff00;
+            cursor: text;
+            overflow-y: scroll;
+            font-family: "Courier New", Consolas, "Lucida Console", monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        #terminal::-webkit-scrollbar {
+            display: none;
+        }
+
+        .line {
+            display: block;
+        }
+
+        .input-cursor {
+            display: inline-block;
+            width: 10px;
+            height: 1em;
+            background-color: white;
+            animation: blink-block 2s steps(1) infinite;
+            vertical-align: bottom;
+        }
+
+        a.terminal-link {
+            color: #00ff00;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        a.terminal-link:hover {
+            color: #66ff66;
+        }
+
+        @keyframes blink-block {
+
+            0%,
+            50%,
+            100% {
+                background-color: white;
+            }
+
+            25%,
+            75% {
+                background-color: transparent;
+            }
+        }
+
+        .error-popup {
+            position: fixed;
+            width: 320px;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            cursor: default;
+        }
+
+        .error-title {
+            background-color: #0078d7;
+            color: white;
+            padding: 5px 10px;
+            font-weight: bold;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: grab;
+        }
+
+        .error-title button {
+            background: none;
+            border: none;
+            color: red;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: white;
+        }
+
+        .error-content {
+            display: flex;
+            padding: 15px;
+        }
+
+        .error-icon {
+            width: 32px;
+            height: 32px;
+            background-color: red;
+            color: white;
+            font-weight: bold;
+            font-size: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+            margin-right: 10px;
+            line-height: 32px;
+        }
+
+        .error-text {
+            font-size: 13px;
+            color: black;
+            flex: 1;
+            line-height: 1.4;
+        }
+
+        .error-buttons {
+            display: flex;
+            justify-content: flex-end;
+            padding: 6px 10px;
+            background-color: #ececec;
+        }
+
+        .error-buttons button {
+            padding: 4px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            background-color: #f5f5f5;
+            border: 1px solid #888;
+            box-shadow: inset 0 1px 0 #fff;
+            margin-left: 5px;
+        }
+
+        .error-buttons button:hover {
+            background-color: #dcdcdc;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="terminal-window" id="terminalWindow">
+        <div class="terminal-bar">
+            <div class="terminal-btn btn-close" id="closeBtn"></div>
+            <div class="terminal-btn btn-minimize" id="minimizeBtn"></div>
+            <div class="terminal-btn btn-maximize" id="maximizeBtn"></div>
+            <div class="drag-area" id="dragArea"></div>
+        </div>
+        <div id="terminal" tabindex="0"></div>
+    </div>
+
+    <script>
+        const terminal = document.getElementById('terminal');
+        let currentLine = '';
+        const promptName = 'RandomPerson@MyComputer:';
+        const commands = {
+            help: "Available commands: help, aboutjake, clear, hello, projects, back, dog, smile, dvd, contactjake, echo, donate",
+            aboutjake: "Hey there! I'm Jake, an upcoming software engineer with some experience in HTML, CSS, JavaScript, Python, Unreal Engine, and other programming languages. While I’m still improving my skills, I have worked on multiple projects, which you can check out using the 'projects' command. My hobbies include gaming (mainly Minecraft and Roblox), coding, and uhh, honestly, I don't know. This website is a work in progress, so please excuse my terrible attempt at making this.",
+            hello: "Hi there!",
+            donate: function() {
+                const line = document.createElement('div');
+                line.className = 'line';
+                line.innerHTML = `Buy Me A Coffee: <a href="https://buymeacoffee.com/jakeyboiishere" target="_blank" class="terminal-link">https://buymeacoffee.com/jakeyboiishere</a>`;
+                terminal.appendChild(line);
+                terminal.scrollTop = terminal.scrollHeight;
+            },
+            echo: function(args) {
+                const safeText = args.join(" ");
+                const line = document.createElement('div');
+                line.className = 'line';
+                line.textContent = safeText;
+                terminal.appendChild(line);
+                terminal.scrollTop = terminal.scrollHeight;
+            },
+            clear: "",
+            projects: function() {
+                const projectLinks = [{
+                        desc: "FSARO project",
+                        url: "https://fsaro.ngo.us"
+                    },
+                    {
+                        desc: "My main website",
+                        url: "https://cataredogs.neocities.org"
+                    },
+                    {
+                        desc: "My Github website",
+                        url: "https://somerandomguyonhere.github.io/WhateverIwant"
+                    }
+                ];
+                projectLinks.forEach(p => {
+                    const line = document.createElement('div');
+                    line.className = 'line';
+                    line.innerHTML = `${p.desc}: <a href="${p.url}" target="_blank" class="terminal-link">${p.url}</a>`;
+                    terminal.appendChild(line);
+                });
+                terminal.scrollTop = terminal.scrollHeight;
+            },
+            contactjake: function() {
+                const line = document.createElement('div');
+                line.className = 'line';
+                line.innerHTML = `Discord: <a href="https://discord.com/users/1185861287528374322" target="_blank" class="terminal-link">https://discord.com/users/1185861287528374322</a>(Jakeyboiishere)`;
+                terminal.appendChild(line);
+                terminal.scrollTop = terminal.scrollHeight;
+            },
+            back: function() {
+                if (document.getElementById('backPopup')) return;
+                const popup = document.createElement('div');
+                popup.className = 'error-popup';
+                popup.id = 'backPopup';
+                popup.innerHTML = `
+      <div class="error-title">
+        Confirmation
+        <button id="backPopupClose">×</button>
+      </div>
+      <div class="error-content">
+        <div class="error-icon" style="background-color:#0078d7;">?</div>
+        <div class="error-text">Are you sure you want to go back to the main website?</div>
+      </div>
+      <div class="error-buttons">
+        <button id="yesBtn">Yes</button>
+        <button id="noBtn">No</button>
+      </div>
+    `;
+                document.body.appendChild(popup);
+
+                popup.style.left = '50%';
+                popup.style.top = '50%';
+                popup.style.transform = 'translate(-50%, -50%)';
+
+                document.getElementById('backPopupClose').addEventListener('click', () => {
+                    document.body.removeChild(popup);
+                });
+                document.getElementById('noBtn').addEventListener('click', () => {
+                    document.body.removeChild(popup);
+                });
+                document.getElementById('yesBtn').addEventListener('click', () => {
+                    window.location.href = 'https://cataredogs.neocities.org/';
+                });
+
+                const errorTitle = popup.querySelector('.error-title');
+                let isDraggingPopup = false,
+                    offsetXPopup = 0,
+                    offsetYPopup = 0;
+
+                errorTitle.addEventListener('mousedown', e => {
+                    isDraggingPopup = true;
+                    const rect = popup.getBoundingClientRect();
+                    offsetXPopup = e.clientX - rect.left;
+                    offsetYPopup = e.clientY - rect.top;
+                    errorTitle.style.cursor = 'grabbing';
+                });
+
+                document.addEventListener('mouseup', () => {
+                    isDraggingPopup = false;
+                    errorTitle.style.cursor = 'grab';
+                });
+                document.addEventListener('mousemove', e => {
+                    if (!isDraggingPopup) return;
+                    popup.style.left = `${e.clientX - offsetXPopup}px`;
+                    popup.style.top = `${e.clientY - offsetYPopup}px`;
+                    popup.style.transform = 'none';
+                });
+            },
+            dog: function() {
+                const imgNum = Math.floor(Math.random() * 10) + 1;
+                if (document.getElementById('dogPopup')) return;
+
+                const overlay = document.createElement('div');
+                overlay.id = 'dogOverlay';
+                overlay.style.position = 'fixed';
+                overlay.style.top = '0';
+                overlay.style.left = '0';
+                overlay.style.width = '100vw';
+                overlay.style.height = '100vh';
+                overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+                overlay.style.zIndex = '999';
+                document.body.appendChild(overlay);
+
+                const popup = document.createElement('div');
+                popup.className = 'error-popup';
+                popup.id = 'dogPopup';
+                popup.style.width = 'auto';
+                popup.style.height = 'auto';
+                popup.style.background = 'transparent';
+                popup.style.left = '50%';
+                popup.style.top = '50%';
+                popup.style.transform = 'translate(-50%, -50%)';
+                popup.style.zIndex = '1000';
+                popup.innerHTML = `
+      <div style="position:relative; display:inline-block;">
+        <img src="https://cataredogs.neocities.org/img-files/dog${imgNum}.jpg" style="max-width:90vw; max-height:90vh; display:block; border-radius:8px;">
+        <button id="dogClose" style="
+          position:absolute; 
+          top:5px; 
+          right:5px; 
+          color:red; 
+          background:white; 
+          border-radius:50%; 
+          width:25px; 
+          height:25px; 
+          border:none; 
+          font-size:25px; 
+          display:flex; 
+          justify-content:center; 
+          align-items:center; 
+          cursor:pointer;
+        ">×</button>
+      </div>
+    `;
+                document.body.appendChild(popup);
+
+                document.getElementById('dogClose').addEventListener('click', () => {
+                    document.body.removeChild(popup);
+                    document.body.removeChild(overlay);
+                });
+            },
+            smile: function() {
+                if (document.getElementById('smilePopup')) return;
+
+                const overlay = document.createElement('div');
+                overlay.id = 'smileOverlay';
+                overlay.style.position = 'fixed';
+                overlay.style.top = '0';
+                overlay.style.left = '0';
+                overlay.style.width = '100vw';
+                overlay.style.height = '100vh';
+                overlay.style.backgroundColor = 'black';
+                overlay.style.zIndex = '999';
+                document.body.appendChild(overlay);
+
+                const popup = document.createElement('div');
+                popup.className = 'error-popup';
+                popup.id = 'smilePopup';
+                popup.style.position = 'fixed';
+                popup.style.top = '50%';
+                popup.style.left = '50%';
+                popup.style.transform = 'translate(-50%, -50%)';
+                popup.style.width = '100vw';
+                popup.style.height = '100vh';
+                popup.style.background = 'black';
+                popup.style.zIndex = '1000';
+                popup.innerHTML = `
+      <img src="https://cataredogs.neocities.org/img-files/jumpscare-gif.gif" style="width:100%; height:100%; object-fit:cover;">
+    `;
+                document.body.appendChild(popup);
+
+                const audio = new Audio('https://somerandomguyonhere.github.io/WhateverIwant/ambush-jumpscare-from-roblox-doors-for-use-101soundboards.mp3');
+                audio.play();
+
+                setTimeout(() => {
+                    if (document.getElementById('smilePopup')) document.body.removeChild(popup);
+                    if (document.getElementById('smileOverlay')) document.body.removeChild(overlay);
+                }, 1000);
+            },
+            dvd: (function() {
+                let dvdCount = 0;
+                const maxDVDs = 100;
+                const overlays = [];
+
+                return function() {
+                    if (dvdCount >= maxDVDs) return;
+
+                    const overlay = document.createElement('div');
+                    overlay.style.position = 'absolute';
+                    overlay.style.top = '0';
+                    overlay.style.left = '0';
+                    overlay.style.width = '100%';
+                    overlay.style.height = '100%';
+                    overlay.style.pointerEvents = 'none';
+                    overlay.style.zIndex = 500 + dvdCount;
+                    terminal.appendChild(overlay);
+                    overlays.push(overlay);
+
+                    const dvd = document.createElement('img');
+                    let logoNumber = 1;
+                    dvd.src = `https://bouncingdvdlogo.com/logos/dvdlogo-0${logoNumber}.svg`;
+                    dvd.style.position = 'absolute';
+                    dvd.style.width = '80px';
+                    dvd.style.height = '80px';
+                    dvd.style.userSelect = 'none';
+                    overlay.appendChild(dvd);
+
+                    let x = Math.random() * (overlay.clientWidth - 80);
+                    let y = Math.random() * (overlay.clientHeight - 80);
+                    let dx = 2 + Math.random() * 2;
+                    let dy = 2 + Math.random() * 2;
+
+                    let bouncedX = false;
+                    let bouncedY = false;
+
+                    function animate() {
+                        x += dx;
+                        y += dy;
+
+                        if (x <= 0 || x >= overlay.clientWidth - 80) {
+                            if (!bouncedX) {
+                                dx = -dx;
+                                logoNumber++;
+                                if (logoNumber > 7) logoNumber = 1;
+                                dvd.src = `https://bouncingdvdlogo.com/logos/dvdlogo-0${logoNumber}.svg`;
+                                bouncedX = true;
+                            }
+                        } else bouncedX = false;
+
+                        if (y <= 0 || y >= overlay.clientHeight - 80) {
+                            if (!bouncedY) {
+                                dy = -dy;
+                                logoNumber++;
+                                if (logoNumber > 7) logoNumber = 1;
+                                dvd.src = `https://bouncingdvdlogo.com/logos/dvdlogo-0${logoNumber}.svg`;
+                                bouncedY = true;
+                            }
+                        } else bouncedY = false;
+
+                        dvd.style.left = x + 'px';
+                        dvd.style.top = y + 'px';
+
+                        requestAnimationFrame(animate);
+                    }
+                    animate();
+
+                    dvdCount++;
+                };
+            })()
+
+        };
+
+        function newInputLine() {
+            const line = document.createElement('div');
+            line.className = 'line';
+            line.innerHTML = `${promptName} `;
+            const cursor = document.createElement('span');
+            cursor.className = 'input-cursor';
+            line.appendChild(cursor);
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+            return {
+                line,
+                cursor
+            };
+        }
+
+        function newLine(text = '') {
+            const line = document.createElement('div');
+            line.className = 'line';
+            line.textContent = text;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        newLine("Jake's Terminal. Type \"help\" for commands.");
+        newInputLine();
+        let inputObj = terminal.lastChild.querySelector('.input-cursor');
+        terminal.focus();
+
+        document.addEventListener('keydown', e => {
+            const lineElem = terminal.lastChild;
+            if (!lineElem) return;
+            const cursor = lineElem.querySelector('.input-cursor');
+
+            if (e.key === 'Backspace') {
+                currentLine = currentLine.slice(0, -1);
+            } else if (e.key === 'Enter') {
+                lineElem.innerHTML = `${promptName} ${currentLine}`;
+
+                const parts = currentLine.trim().split(" ");
+                const cmd = parts[0].toLowerCase();
+                const args = parts.slice(1);
+
+                if (commands.hasOwnProperty(cmd)) {
+                    if (cmd === 'clear') {
+                        terminal.innerHTML = '';
+                        newLine("Jake's Terminal. Type \"help\" for commands.");
+                    } else if (typeof commands[cmd] === 'function') {
+                        commands[cmd](args);
+                    } else {
+                        newLine(commands[cmd]);
+                    }
+                } else if (cmd !== '') {
+                    newLine(`Command not found. Type "help".`);
+                }
+
+                currentLine = '';
+                inputObj = newInputLine().cursor;
+            } else if (e.key.length === 1) {
+                currentLine += e.key;
+            }
+
+            if (cursor) {
+                cursor.parentNode.innerHTML = `${promptName} ${currentLine}<span class="input-cursor"></span>`;
+            }
+            terminal.scrollTop = terminal.scrollHeight;
+        });
+
+        const terminalWindow = document.getElementById('terminalWindow');
+
+        function centerTerminal() {
+            terminalWindow.style.left = `${(window.innerWidth - terminalWindow.offsetWidth)/2}px`;
+            terminalWindow.style.top = `${(window.innerHeight - terminalWindow.offsetHeight)/2}px`;
+        }
+        centerTerminal();
+        window.addEventListener('resize', centerTerminal);
+
+        const dragArea = document.getElementById('dragArea');
+        let isDragging = false,
+            offsetX = 0,
+            offsetY = 0;
+        dragArea.addEventListener('mousedown', e => {
+            if (isMaximized) return;
+            isDragging = true;
+            offsetX = e.clientX - terminalWindow.offsetLeft;
+            offsetY = e.clientY - terminalWindow.offsetTop;
+            dragArea.style.cursor = 'grabbing';
+        });
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            dragArea.style.cursor = 'grab';
+        });
+        document.addEventListener('mousemove', e => {
+            if (!isDragging) return;
+            terminalWindow.style.left = `${e.clientX-offsetX}px`;
+            terminalWindow.style.top = `${e.clientY-offsetY}px`;
+        });
+
+        const maximizeBtn = document.getElementById('maximizeBtn');
+        let isMaximized = false;
+        let prevState = {};
+        // From line 597-665 shade helped
+        maximizeBtn.addEventListener('click', () => {
+            if (!isMaximized) {
+                prevState = {
+                    top: terminalWindow.offsetTop,
+                    left: terminalWindow.offsetLeft,
+                    width: terminalWindow.offsetWidth,
+                    height: terminalWindow.offsetHeight
+                };
+                if (isMinimized) {
+                    // removing px from the end because the code is wonky and i cant be bothered fixing it too much
+                    prevState.height = preMinState.height.slice(0,-2)
+                }
+
+                terminalWindow.style.position = 'fixed';
+                terminalWindow.style.top = '0';
+                terminalWindow.style.left = '0';
+                terminalWindow.style.width = '100vw';
+
+                if (!isMinimized) {
+                    terminalWindow.style.height = '100vh';
+                }
+
+                isMaximized = true;
+            } else {
+                terminalWindow.style.position = 'absolute';
+                terminalWindow.style.top = prevState.top + 'px';
+                terminalWindow.style.left = prevState.left + 'px';
+                terminalWindow.style.width = prevState.width + 'px';
+                terminalWindow.style.borderRadius = '8px';
+                terminalWindow.style.maxWidth = '';
+                terminalWindow.style.maxHeight = '';
+
+                if (!isMinimized) {
+                    terminalWindow.style.height = prevState.height + 'px';
+                } else {
+                    terminalWindow.style.height = '30px';
+                }
+
+                isMaximized = false;
+            }
+        });
+
+        const minimizeBtn = document.getElementById('minimizeBtn');
+        let isMinimized = false;
+        let preMinState = {
+            height: terminalWindow.offsetHeight + 'px'
+        };
+        minimizeBtn.addEventListener('click', () => {
+            if (!isMinimized) {
+                if (!isMaximized) {
+                    preMinState = {
+                        height: terminalWindow.offsetHeight + 'px'
+                    }
+                }
+                
+                terminalWindow.style.height = '30px';
+                terminal.style.display = 'none';
+                isMinimized = true;
+            } else {
+                if (isMaximized) {
+                    terminalWindow.style.height = '100vh';
+                } else {
+                    terminalWindow.style.height = preMinState.height;
+                }
+
+                terminal.style.display = 'block';
+                isMinimized = false;
+            }
+        });
+
+        const closeBtn = document.getElementById('closeBtn');
+        closeBtn.addEventListener('click', () => {
+            if (document.getElementById('closePopup')) return;
+            const popup = document.createElement('div');
+            popup.className = 'error-popup';
+            popup.id = 'closePopup';
+            popup.innerHTML = `
+    <div class="error-title">
+      Error
+      <button id="closePopupBtn">×</button>
+    </div>
+    <div class="error-content">
+      <div class="error-icon">X</div>
+      <div class="error-text">An error has occurred. Cannot close terminal. To go back to the main website please type "back".</div>
+    </div>
+    <div class="error-buttons">
+      <button id="closePopupOk">Okay</button>
+    </div>
+  `;
+            document.body.appendChild(popup);
+            popup.style.left = '50%';
+            popup.style.top = '50%';
+            popup.style.transform = 'translate(-50%, -50%)';
+
+            const closePopupBtn = document.getElementById('closePopupBtn');
+            const closePopupOk = document.getElementById('closePopupOk');
+            closePopupBtn.addEventListener('click', () => {
+                document.body.removeChild(popup);
+            });
+            closePopupOk.addEventListener('click', () => {
+                document.body.removeChild(popup);
+            });
+
+            const errorTitle = popup.querySelector('.error-title');
+            let dragging = false,
+                offX = 0,
+                offY = 0;
+            errorTitle.addEventListener('mousedown', e => {
+                dragging = true;
+                const rect = popup.getBoundingClientRect();
+                offX = e.clientX - rect.left;
+                offY = e.clientY - rect.top;
+                errorTitle.style.cursor = 'grabbing';
+            });
+            document.addEventListener('mouseup', () => {
+                dragging = false;
+                errorTitle.style.cursor = 'grab';
+            });
+            document.addEventListener('mousemove', e => {
+                if (!dragging) return;
+                popup.style.left = `${e.clientX-offX}px`;
+                popup.style.top = `${e.clientY-offY}px`;
+                popup.style.transform = 'none';
+            });
+        });
+    </script>
+
+</body>
+
+</html>
