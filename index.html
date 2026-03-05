@@ -302,8 +302,12 @@
                 document.getElementById('noBtn').addEventListener('click', () => {
                     document.body.removeChild(popup);
                 });
-               document.getElementById('yesBtn').addEventListener('click', () => {
-    window.history.back();
+              document.getElementById('yesBtn').addEventListener('click', () => {
+    if (window.history.length > 1) {
+        history.back();
+    } else {
+window.close()
+    }
 });
 
                 const errorTitle = popup.querySelector('.error-title');
